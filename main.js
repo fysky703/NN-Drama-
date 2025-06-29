@@ -1,15 +1,7 @@
 
-  let movies = []; // ✅ Global variable
-
-// ឧទាហរណ៍ Load តាម localStorage ឬ Fetch JSON
-// Example:
-movies = JSON.parse(localStorage.getItem('movies')) || [];
-  const GITHUB_API = 'https://api.github.com';
-const REPO = 'fysky703/admin-dashboard-data';
-const PATH = 'movie.json';
-const BRANCH = 'main';
-const TOKEN = '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';
-  document.addEventListener('DOMContentLoaded', () => {
+const PROJECT_ID = '71208519'; // ✅ Repo ID
+const TOKEN = 'glft-hjU4Q9CpkFVUjNsWxq2h'; // ✅ Feed Token
+document.addEventListener('DOMContentLoaded', () => {
             // --- DATA ---
             let movies = [
                 { "id": 1, "title": "Inception", "posterUrl": "https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_SX300.jpg", "genre": "Sci-Fi", "year": 2010, "description": "A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.", "rating": 8.8, "featured": true, "top": true },
@@ -168,7 +160,7 @@ const TOKEN = 'github_pat_11AYCPERY0MhdrheQppacb_3S0BTdA4E2F8kqxyRyCmLxcAskhgAg6
     
     closeAddMovieModal();
     renderAll();
-    commitMoviesToGitHub(); // ✅ CALL នៅទីនេះ!
+              commitMoviesToGitLab();
 };
     
         const handleEditClick = (e) => {
@@ -198,8 +190,8 @@ const TOKEN = 'github_pat_11AYCPERY0MhdrheQppacb_3S0BTdA4E2F8kqxyRyCmLxcAskhgAg6
 
               hideDeleteToast();
               renderAll();
+              commitMoviesToGitLab();
 
-              commitMoviesToGitHub(); // ✅ CALL function commit JSON ទៅ GitHub
                  };
             const handleUndoDelete = () => {
                 clearTimeout(deleteTimeout);
@@ -319,30 +311,28 @@ const TOKEN = 'github_pat_11AYCPERY0MhdrheQppacb_3S0BTdA4E2F8kqxyRyCmLxcAskhgAg6
 
             renderAll();
         });
-        async function commitMoviesToGitHub() {
-  const content = btoa(JSON.stringify(movies, null, 2));
+   async function commitMoviesToGitLab() {
+  const content = JSON.stringify(movies, null, 2);
 
-  // STEP 1: Get SHA
-  const getRes = await fetch(`${GITHUB_API}/repos/${REPO}/contents/${PATH}`, {
-    headers: { 'Authorization': `token ${TOKEN}` }
-  });
-  const fileData = await getRes.json();
-
-  // STEP 2: PUT updated JSON
-  const res = await fetch(`${GITHUB_API}/repos/${REPO}/contents/${PATH}`, {
-    method: 'PUT',
+  const res = await fetch(`https://gitlab.com/api/v4/projects/${PROJECT_ID}/repository/commits`, {
+    method: 'POST',
     headers: {
-      'Authorization': `token ${TOKEN}`,
+      'PRIVATE-TOKEN': TOKEN,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      message: 'Update movie.json',
-      content: content,
-      branch: BRANCH,
-      sha: fileData.sha
+      branch: 'main',
+      commit_message: 'Update movies.json',
+      actions: [
+        {
+          action: 'update',
+          file_path: 'movies.json',
+          content: content
+        }
+      ]
     })
   });
 
   const data = await res.json();
-  console.log('✅ GitHub Commit Response:', data);
+  console.log('✅ GitLab Commit Response:', data);
 }
