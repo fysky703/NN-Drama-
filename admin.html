@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OnStream Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root { --primary: #A4F400; --secondary: #1a1a1a; --background: #121212; --text-main: #E0E0E0; --danger: #ef4444; }
+        html, body { height: 100%; }
+        body { background-color: var(--background); color: var(--text-main); font-family: 'Inter', sans-serif; }
+        .modal-bg { background-color: rgba(0,0,0,0.7); opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease; }
+        .modal-bg.active { opacity: 1; visibility: visible; }
+        .modal-content { background-color: #1f2937; transform: scale(0.95); transition: transform 0.3s ease; }
+        .modal-bg.active .modal-content { transform: scale(1); }
+        .btn-primary { background-color: #4f46e5; color: white; font-weight: 600; }
+        .btn-primary:disabled { background-color: #3730a3; cursor: not-allowed; }
+        .btn-secondary { background-color: #4b5563; color: white; }
+        .btn-danger { background-color: var(--danger); color: white; }
+        .form-input, textarea, select { 
+            background-color: #374151; 
+            border: 2px solid transparent; 
+            color: var(--text-main); 
+            border-radius: 0.5rem; 
+            padding: 0.75rem; 
+            transition: border-color 0.2s ease, box-shadow 0.2s ease; 
+        }
+        .form-input:focus, textarea:focus, select:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #2a2a2a; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+
+        /* Styles for nested dynamic forms */
+        .episode-item, .subtitle-item {
+            background-color: #2F3644;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #4b5563;
+        }
+        .episode-item .form-input, .subtitle-item .form-input {
+            background-color: #242933;
+            border-color: #374151;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <div id="app-container" class="w-full max-w-6xl mx-auto flex flex-col h-full">
+        <!-- Header -->
+        <header class="bg-gray-800 p-4 flex justify-between items-center sticky top-0 z-10">
+            <div class="flex items-center gap-3"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 0C7.16344 0 0 7.16344 0 16C0 24.8366 7.16344 32 16 32C24.8366 32 32 24.8366 32 16C32 7.16344 24.8366 0 16 0ZM21.616 23.1111C21.616 24.9689 20.1378 26.4471 18.28 26.4471H13.72C11.8622 26.4471 10.384 24.9689 10.384 23.1111V8.88889C10.384 7.03111 11.8622 5.55289 13.72 5.55289H16.864C20.008 5.55289 21.616 7.88267 21.616 10.1511V23.1111Z" fill="#A4F400"/></svg><h1 class="text-2xl font-bold">OnStream Admin</h1></div>
+            <button id="add-movie-btn" class="bg-[#A4F400] text-black font-bold py-2 px-4 rounded-lg flex items-center gap-2"><i data-lucide="plus"></i> Add Content</button>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-4 md:p-6 overflow-y-auto">
+            <div class="bg-gray-800/50 rounded-lg overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left min-w-[900px]">
+                        <thead class="bg-gray-700/50">
+                            <tr>
+                                <th class="p-4">Poster</th>
+                                <th class="p-4">Title</th>
+                                <th class="p-4">Year</th>
+                                <th class="p-4">Genre</th>
+                                <th class="p-4">Type</th>
+                                <th class="p-4">Category</th>
+                                <th class="p-4">Last Updated</th>
+                                <th class="p-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="movies-table-body">
+                            <tr>
+                                <td colspan="8" class="text-center p-8 text-gray-500">
+                                    <div class="flex justify-center items-center gap-2">
+                                        <i data-lucide="loader-2" class="animate-spin"></i>
+                                        <span>Loading data...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modern Form Modal -->
+    <div id="movie-modal" class="fixed inset-0 modal-bg items-center justify-center z-50 p-4">
+        <div class="modal-content w-full max-w-2xl p-0 rounded-xl shadow-2xl max-h-full flex flex-col">
+            <div class="p-6 flex-shrink-0">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 id="modal-title" class="text-2xl font-bold text-white">Add New Content</h2>
+                        <p class="mt-1 text-sm text-gray-400">Fill in the details for the new content item.</p>
+                    </div>
+                    <button id="close-modal-btn" class="text-gray-500 hover:text-white"><i data-lucide="x"></i></button>
+                </div>
+            </div>
+            <hr class="border-gray-700">
+            <div class="p-6 flex-grow overflow-y-auto">
+                <form id="movie-form" class="space-y-6">
+                    <input type="hidden" id="movie-id">
+                    <!-- New hidden input for backdrop URL -->
+                    <input type="hidden" id="backdrop-url"> 
+
+                    <div><label for="title" class="block mb-2 text-sm font-medium text-gray-300">Title</label><input type="text" id="title" class="w-full form-input" required></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div><label for="poster" class="block mb-2 text-sm font-medium text-gray-300">Poster URL</label><input type="url" id="poster" class="w-full form-input" required></div>
+                        <div>
+                            <label for="tmdbId" class="block mb-2 text-sm font-medium text-gray-300">TMDb ID (for details)</label>
+                            <input type="text" id="tmdbId" class="w-full form-input" placeholder="e.g., 603">
+                            <button type="button" id="fetch-tmdb-btn" class="mt-2 bg-blue-600 text-white text-sm py-1.5 px-3 rounded-md hover:bg-blue-700">Fetch TMDb Data</button>
+                        </div>
+                    </div>
+                    <div><label for="description" class="block mb-2 text-sm font-medium text-gray-300">Description</label><textarea id="description" class="w-full form-input" rows="4"></textarea></div>
+                    <div>
+                        <label for="genre" class="block mb-2 text-sm font-medium text-gray-300">Genre</label>
+                        <input type="text" id="genre" class="w-full form-input" placeholder="e.g., Action, Drama, Comedy">
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div><label for="country" class="block mb-2 text-sm font-medium text-gray-300">Country</label><select id="country" class="w-full form-input"></select></div>
+                        <div><label for="year" class="block mb-2 text-sm font-medium text-gray-300">Year</label><input type="number" id="year" class="w-full form-input" placeholder="e.g., 2025" min="1900" max="2100"></div>
+                        <div><label for="quality" class="block mb-2 text-sm font-medium text-gray-300">Quality</label><select id="quality" class="w-full form-input"><option>HD</option><option>SD</option><option>CAM</option></select></div>
+                        <div><label for="rating" class="block mb-2 text-sm font-medium text-gray-300">Rating</label><input type="number" step="0.1" id="rating" class="w-full form-input" placeholder="e.g., 8.2" min="0" max="10"></div>
+                        <div><label for="votes" class="block mb-2 text-sm font-medium text-gray-300">Votes</label><input type="number" id="votes" class="w-full form-input" placeholder="e.g., 1040" min="0"></div>
+                        <div><label for="type" class="block mb-2 text-sm font-medium text-gray-300">Content Type</label><select id="type" class="w-full form-input"><option value="Movie">Movie</option><option value="TV Series">TV Series</option></select></div>
+                        <div><label for="category" class="block mb-2 text-sm font-medium text-gray-300">Category</label><select id="category" class="w-full form-input"><option value="None">None</option><option value="Trending">Trending</option><option value="Popular">Popular</option></select></div>
+                        <div><label for="trendingScope" class="block mb-2 text-sm font-medium text-gray-300">Trending Scope</label><select id="trendingScope" class="w-full form-input"><option value="None">None</option><option value="Day">Day</option><option value="Week">Week</option></select></div>
+                        <div class="md:col-span-2"><label for="isFeatured" class="block mb-2 text-sm font-medium text-gray-300">Featured Slider</label><select id="isFeatured" class="w-full form-input"><option value="false">No</option><option value="true">Yes</option></select></div>
+                    </div>
+
+                    <!-- Movie Specific Fields -->
+                    <div id="movie-specific-fields" class="space-y-6 border-t border-gray-700 pt-6">
+                        <h3 class="text-xl font-semibold text-white">Movie Details</h3>
+                        <div>
+                            <label for="movie-video-url" class="block mb-2 text-sm font-medium text-gray-300">Video URL</label>
+                            <input type="url" id="movie-video-url" class="w-full form-input" placeholder="e.g., https://example.com/movie.mp4">
+                        </div>
+                        <div id="movie-subtitles-container" class="space-y-4">
+                            <h4 class="text-lg font-medium text-gray-300">Subtitles</h4>
+                            <!-- Subtitle forms will be injected here -->
+                        </div>
+                        <button type="button" id="add-movie-subtitle-btn" class="bg-gray-700 text-white py-2 px-4 rounded-lg flex items-center gap-2 text-sm hover:bg-gray-600"><i data-lucide="plus"></i> Add Subtitle</button>
+                    </div>
+
+                    <!-- TV Series Specific Fields -->
+                    <div id="series-episodes-fields" class="space-y-6 border-t border-gray-700 pt-6">
+                        <h3 class="text-xl font-semibold text-white">Episodes</h3>
+                        <div class="space-y-4 bg-gray-700/30 p-4 rounded-lg">
+                            <h4 class="text-lg font-medium text-gray-300">Bulk Add Episodes</h4>
+                            <div>
+                                <label for="bulk-episode-urls" class="block mb-2 text-sm font-medium text-gray-400">Paste Episode URLs (one per line)</label>
+                                <textarea id="bulk-episode-urls" class="w-full form-input" rows="4" placeholder="https://example.com/ep1.mp4
+https://example.com/ep2.mp4"></textarea>
+                            </div>
+                            <button type="button" id="add-bulk-episodes-btn" class="bg-purple-600 text-white py-2 px-4 rounded-lg flex items-center gap-2 text-sm hover:bg-purple-700"><i data-lucide="list-plus"></i> Add Bulk Episodes</button>
+                        </div>
+                        <div id="episodes-list" class="space-y-4">
+                            <!-- Episode forms will be injected here -->
+                        </div>
+                        <button type="button" id="add-episode-btn" class="bg-gray-700 text-white py-2 px-4 rounded-lg flex items-center gap-2 text-sm hover:bg-gray-600"><i data-lucide="plus"></i> Add Single Episode</button>
+                    </div>
+
+                    <div class="pt-6 border-t border-gray-700 flex justify-end gap-4">
+                        <button type="button" id="cancel-btn" class="btn-secondary font-semibold py-2.5 px-6 rounded-lg">Cancel</button>
+                        <button type="submit" id="save-btn" class="btn-primary font-bold py-2.5 px-6 rounded-lg flex items-center justify-center gap-2">
+                            <span id="save-btn-text">Save Content</span>
+                            <i id="save-spinner" data-lucide="loader-2" class="animate-spin hidden"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div id="delete-modal" class="fixed inset-0 modal-bg items-center justify-center z-50 p-4">
+        <div class="modal-content w-full max-w-sm p-6 rounded-lg shadow-lg text-center">
+            <h2 class="text-xl font-bold mb-4">Are you sure?</h2>
+            <p class="text-gray-400 mb-6">This process cannot be undone.</p>
+            <div class="flex justify-center gap-4">
+                <button id="cancel-delete-btn" class="btn-secondary font-semibold py-2 px-6 rounded-lg">Cancel</button>
+                <button id="confirm-delete-btn" class="btn-danger font-bold py-2 px-6 rounded-lg">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, getDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+          apiKey: "AIzaSyAvaKiiLs9TBwOfmA77k7QvVXUMITJy9f4",
+          authDomain: "login-example-22070.firebaseapp.com",
+          databaseURL: "https://login-example-22070-default-rtdb.firebaseio.com",
+          projectId: "login-example-22070",
+          storageBucket: "login-example-22070.appspot.com",
+          messagingSenderId: "37358045952",
+          appId: "1:37358045952:web:e1eaf0034cb82c3a1101e5"
+        };
+        
+        // --- IMPORTANT: REPLACE WITH YOUR TMDb API KEY ---
+        const TMDB_API_KEY = "473d64bf84e64bd7d50c999bccecaf1d"; 
+        // --- END IMPORTANT ---
+
+        // Expanded list of countries
+        const countries = ["Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bhutan","Bolivia","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cabo Verde","Cambodia","Cameroon","Canada","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo, Democratic Republic of the","Congo, Republic of the","Costa Rica","Cote d'Ivoire","Croatia","Cuba","Cyprus","Czech Republic","Denmark","Djibouti","Dominica","Dominican Republic","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Eswatini","Ethiopia","Fiji","Finland","France","Gabon","Gambia","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Morocco","Mozambique","Myanmar (Burma)","Namibia","Nauru","Nepal","Netherlands","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestine State","Panama","Papua New Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania","Russia","Rwanda","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Timor-Leste","Togo","Tonga","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States of America","Uruguay","Uzbekistan","Vanuatu","Vatican City","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe"];
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const moviesCollection = collection(db, "movies");
+
+        const movieForm = document.getElementById('movie-form');
+        const moviesTableBody = document.getElementById('movies-table-body');
+        const addMovieBtn = document.getElementById('add-movie-btn');
+        const movieModal = document.getElementById('movie-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const modalTitle = document.getElementById('modal-title');
+        const deleteModal = document.getElementById('delete-modal');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+        const saveBtn = document.getElementById('save-btn');
+        const saveBtnText = document.getElementById('save-btn-text');
+        const saveSpinner = document.getElementById('save-spinner');
+        let movieIdToDelete = null;
+
+        // New elements for dynamic content and TMDb
+        const tmdbIdInput = document.getElementById('tmdbId');
+        const fetchTmdbBtn = document.getElementById('fetch-tmdb-btn');
+        const descriptionInput = document.getElementById('description');
+        const genreInput = document.getElementById('genre');
+        const ratingInput = document.getElementById('rating');
+        const votesInput = document.getElementById('votes');
+        const yearInput = document.getElementById('year');
+        const posterInput = document.getElementById('poster');
+        const titleInput = document.getElementById('title');
+        const backdropUrlInput = document.getElementById('backdrop-url'); // New: Backdrop URL hidden input
+
+
+        const contentTypeSelect = document.getElementById('type');
+        const movieSpecificFields = document.getElementById('movie-specific-fields');
+        const seriesEpisodesFields = document.getElementById('series-episodes-fields');
+        const movieVideoUrlInput = document.getElementById('movie-video-url');
+        const movieSubtitlesContainer = document.getElementById('movie-subtitles-container');
+        const addMovieSubtitleBtn = document.getElementById('add-movie-subtitle-btn');
+        const addEpisodeBtn = document.getElementById('add-episode-btn');
+        const episodesList = document.getElementById('episodes-list');
+        const bulkEpisodeUrlsInput = document.getElementById('bulk-episode-urls');
+        const addBulkEpisodesBtn = document.getElementById('add-bulk-episodes-btn');
+
+        function populateDropdown(selectId, options) {
+            const select = document.getElementById(selectId);
+            if (select) select.innerHTML = options.map(option => `<option value="${option}">${option}</option>`).join('');
+        }
+
+        const openModal = (modalEl) => modalEl.classList.add('active', 'flex'); 
+        const closeModal = (modalEl) => modalEl.classList.remove('active', 'flex');
+        
+        // Helper to clear all dynamic fields
+        function clearDynamicFields() {
+            movieVideoUrlInput.value = '';
+            movieSubtitlesContainer.innerHTML = '<h4 class="text-lg font-medium text-gray-300">Subtitles</h4>';
+            episodesList.innerHTML = '';
+            bulkEpisodeUrlsInput.value = '';
+        }
+
+        // --- Subtitle Management ---
+        function addSubtitleForm(container, existingSub = {}) {
+            const subtitleId = `subtitle-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+            const div = document.createElement('div');
+            div.className = 'subtitle-item bg-gray-700/30 p-3 rounded-md flex flex-col gap-3 relative';
+            div.innerHTML = `
+                <button type="button" class="remove-subtitle-btn absolute top-2 right-2 text-red-400 hover:text-red-300"><i data-lucide="x-circle" class="w-5 h-5"></i></button>
+                <div>
+                    <label for="${subtitleId}-label" class="block mb-1 text-sm font-medium text-gray-400">Label</label>
+                    <input type="text" id="${subtitleId}-label" class="w-full form-input subtitle-label" value="${existingSub.label || ''}" placeholder="e.g., English">
+                </div>
+                <div>
+                    <label for="${subtitleId}-srclang" class="block mb-1 text-sm font-medium text-gray-400">Language Code (srclang)</label>
+                    <input type="text" id="${subtitleId}-srclang" class="w-full form-input subtitle-srclang" value="${existingSub.srclang || ''}" placeholder="e.g., en, km">
+                </div>
+                <div>
+                    <label for="${subtitleId}-url" class="block mb-1 text-sm font-medium text-gray-400">Subtitle URL (.vtt)</label>
+                    <input type="url" id="${subtitleId}-url" class="w-full form-input subtitle-url" value="${existingSub.url || ''}" placeholder="e.g., https://example.com/sub.vtt">
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="${subtitleId}-default" class="subtitle-default h-4 w-4 text-blue-600 rounded" ${existingSub.default ? 'checked' : ''}>
+                    <label for="${subtitleId}-default" class="text-sm font-medium text-gray-300">Set as Default</label>
+                </div>
+            `;
+            container.appendChild(div);
+            lucide.createIcons();
+            
+            div.querySelector('.remove-subtitle-btn').addEventListener('click', () => {
+                div.remove();
+            });
+        }
+
+        // --- Episode Management (for TV Series) ---
+        function addEpisodeForm(existingEpisode = {}) {
+            const episodeId = `episode-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+            const div = document.createElement('div');
+            div.className = 'episode-item space-y-4 relative';
+            div.innerHTML = `
+                <button type="button" class="remove-episode-btn absolute top-4 right-4 text-red-400 hover:text-red-300"><i data-lucide="x-circle" class="w-6 h-6"></i></button>
+                <h4 class="text-lg font-semibold text-white">Episode Details</h4>
+                <div>
+                    <label for="${episodeId}-title" class="block mb-1 text-sm font-medium text-gray-300">Episode Title</label>
+                    <input type="text" id="${episodeId}-title" class="w-full form-input episode-title" value="${existingEpisode.title || ''}" placeholder="e.g., Episode 1: The Beginning">
+                </div>
+                <div>
+                    <label for="${episodeId}-url" class="block mb-1 text-sm font-medium text-gray-300">Episode Video URL</label>
+                    <input type="url" id="${episodeId}-url" class="w-full form-input episode-url" value="${existingEpisode.url || ''}" placeholder="e.g., https://example.com/episode1.mp4">
+                </div>
+                <div id="${episodeId}-subtitles-container" class="episode-subtitles-container space-y-3 p-3 bg-gray-800/40 rounded-md">
+                    <h5 class="text-base font-medium text-gray-300">Episode Subtitles</h5>
+                    <!-- Subtitle forms for this episode will be injected here -->
+                </div>
+                <button type="button" class="add-episode-subtitle-btn bg-gray-700 text-white py-1.5 px-3 rounded-lg flex items-center gap-1.5 text-xs hover:bg-gray-600"><i data-lucide="plus" class="w-4 h-4"></i> Add Subtitle for Episode</button>
+            `;
+            episodesList.appendChild(div);
+            lucide.createIcons();
+
+            const episodeSubtitlesContainer = div.querySelector(`#${episodeId}-subtitles-container`);
+            div.querySelector('.add-episode-subtitle-btn').addEventListener('click', () => addSubtitleForm(episodeSubtitlesContainer));
+            div.querySelector('.remove-episode-btn').addEventListener('click', () => div.remove());
+
+            // Populate existing subtitles for this episode
+            if (existingEpisode.subtitles && Array.isArray(existingEpisode.subtitles)) {
+                existingEpisode.subtitles.forEach(sub => addSubtitleForm(episodeSubtitlesContainer, sub));
+            }
+        }
+
+        // --- UI Logic based on Content Type ---
+        function toggleContentTypeFields() {
+            const selectedType = contentTypeSelect.value;
+            if (selectedType === 'Movie') {
+                movieSpecificFields.classList.remove('hidden');
+                seriesEpisodesFields.classList.add('hidden');
+            } else if (selectedType === 'TV Series') {
+                movieSpecificFields.classList.add('hidden');
+                seriesEpisodesFields.classList.remove('hidden');
+            }
+            // Reset description/rating/votes fields when type changes if they were auto-populated by TMDb
+            // This prevents carry-over when changing from Movie to TV Series type (TMDb IDs are different types)
+            descriptionInput.value = '';
+            ratingInput.value = '';
+            votesInput.value = '';
+        }
+
+        // --- TMDb Integration ---
+        // Async function to fetch data from TMDb
+        async function fetchTMDbDetails() {
+            const tmdbId = tmdbIdInput.value.trim();
+            if (!tmdbId || TMDB_API_KEY === "YOUR_TMDB_API_KEY" || !TMDB_API_KEY) {
+                alert("Please enter a TMDb ID and ensure your API Key is set.");
+                return;
+            }
+
+            let fetchedData = null;
+            let fetchedType = null; // To store if it's movie or TV
+
+            // Try fetching as a Movie first
+            try {
+                const movieUrl = `https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${TMDB_API_KEY}&language=en-US&append_to_response=videos,images`;
+                const movieResponse = await fetch(movieUrl);
+                if (movieResponse.ok) {
+                    fetchedData = await movieResponse.json();
+                    fetchedType = 'Movie';
+                }
+            } catch (error) {
+                console.warn("Failed to fetch as Movie:", error);
+            }
+
+            // If not found as Movie, try fetching as a TV Series
+            if (!fetchedData) {
+                try {
+                    const tvUrl = `https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=en-US&append_to_response=videos,images`;
+                    const tvResponse = await fetch(tvUrl);
+                    if (tvResponse.ok) {
+                        fetchedData = await tvResponse.json();
+                        fetchedType = 'TV Series';
+                    }
+                } catch (error) {
+                    console.warn("Failed to fetch as TV Series:", error);
+                }
+            }
+
+            if (fetchedData && fetchedType) {
+                // Populate common fields
+                titleInput.value = fetchedData.title || fetchedData.name || ''; 
+                descriptionInput.value = fetchedData.overview || '';
+                posterInput.value = fetchedData.poster_path ? `https://image.tmdb.org/t/p/w500${fetchedData.poster_path}` : '';
+                
+                // NEW: Populate backdrop URL
+                // Check for backdrops and pick the first one (usually the best quality)
+                const backdropPath = fetchedData.backdrop_path || (fetchedData.images && fetchedData.images.backdrops && fetchedData.images.backdrops.length > 0 ? fetchedData.images.backdrops[0].file_path : null);
+                backdropUrlInput.value = backdropPath ? `https://image.tmdb.org/t/p/w1280${backdropPath}` : ''; // Store w1280 size
+
+                genreInput.value = fetchedData.genres ? fetchedData.genres.map(g => g.name).join(', ') : '';
+                ratingInput.value = fetchedData.vote_average ? fetchedData.vote_average.toFixed(1) : '';
+                votesInput.value = fetchedData.vote_count || '';
+                
+                // Set year based on type
+                if (fetchedType === 'Movie') {
+                    yearInput.value = fetchedData.release_date ? new Date(fetchedData.release_date).getFullYear() : '';
+                } else { // TV Series
+                    yearInput.value = fetchedData.first_air_date ? new Date(fetchedData.first_air_date).getFullYear() : '';
+                }
+
+                // Automatically set Content Type
+                contentTypeSelect.value = fetchedType;
+                toggleContentTypeFields(); // This will show/hide relevant sections
+
+                // Optional: Extract trailer URL (YouTube only for now)
+                const trailers = fetchedData.videos?.results.filter(video => video.site === 'YouTube' && video.type === 'Trailer');
+                if (trailers && trailers.length > 0) {
+                    // You might want to save this to Firestore if you add a 'trailerUrl' field
+                    // For example: movieData.trailerUrl = `https://www.youtube.com/watch?v=${trailers[0].key}`;
+                    console.log("Trailer URL (for saving if you add a field):", `https://www.youtube.com/watch?v=${trailers[0].key}`);
+                }
+
+                alert('TMDb data fetched successfully!');
+
+            } else {
+                alert('Failed to fetch TMDb data. Please check the ID and type, or try again.');
+                console.error("TMDb Fetch Error: No data found for ID:", tmdbId);
+            }
+        }
+
+        const mainApp = () => {
+            populateDropdown('country', countries.sort());
+            toggleContentTypeFields(); // Set initial state
+            contentTypeSelect.addEventListener('change', toggleContentTypeFields);
+
+            // TMDb event listener
+            fetchTmdbBtn.addEventListener('click', fetchTMDbDetails);
+
+            addMovieBtn.addEventListener('click', () => { 
+                modalTitle.textContent = 'Add New Content'; 
+                movieForm.reset(); 
+                document.getElementById('year').value = new Date().getFullYear(); 
+                document.getElementById('rating').value = ''; 
+                document.getElementById('votes').value = '';
+                document.getElementById('isFeatured').value = 'false'; 
+                document.getElementById('category').value = 'None'; 
+                document.getElementById('trendingScope').value = 'None'; 
+                tmdbIdInput.value = ''; // Clear TMDb ID on new content
+                backdropUrlInput.value = ''; // Clear backdrop URL
+
+                contentTypeSelect.value = 'Movie'; // Default to movie
+                clearDynamicFields(); 
+                toggleContentTypeFields(); 
+                openModal(movieModal); 
+            });
+            closeModalBtn.addEventListener('click', () => closeModal(movieModal));
+            cancelBtn.addEventListener('click', () => closeModal(movieModal));
+
+            addMovieSubtitleBtn.addEventListener('click', () => addSubtitleForm(movieSubtitlesContainer));
+            addEpisodeBtn.addEventListener('click', addEpisodeForm);
+
+            // Bulk Episode URLs
+            addBulkEpisodesBtn.addEventListener('click', () => {
+                const urls = bulkEpisodeUrlsInput.value.split('\n').map(url => url.trim()).filter(url => url);
+                if (urls.length === 0) {
+                    alert("Please paste at least one URL.");
+                    return;
+                }
+                urls.forEach((url, index) => {
+                    const currentEpisodeCount = episodesList.querySelectorAll('.episode-item').length;
+                    addEpisodeForm({ title: `Episode ${currentEpisodeCount + 1}`, url: url, subtitles: [] });
+                });
+                bulkEpisodeUrlsInput.value = ''; // Clear after adding
+            });
+
+
+            const q = query(moviesCollection, orderBy("updatedAt", "desc"));
+            onSnapshot(q, (snapshot) => {
+                if (snapshot.empty) {
+                    moviesTableBody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-gray-500">No content found.</td></tr>`;
+                    return;
+                }
+                moviesTableBody.innerHTML = snapshot.docs.map(doc => {
+                    const movie = doc.data();
+                    const updatedDate = movie.updatedAt ? movie.updatedAt.toDate().toLocaleString('en-GB') : 'N/A';
+                    return `
+                        <tr class="border-b border-gray-700/50 hover:bg-gray-900/50">
+                            <td class="p-4"><img src="${movie.poster || 'https://placehold.co/48x64/181A20/FFFFFF?text=No+Poster'}" alt="${movie.title}" class="w-12 h-16 object-cover rounded"></td>
+                            <td class="p-4 font-semibold">${movie.title}</td>
+                            <td class="p-4 text-gray-400">${movie.year || 'N/A'}</td>
+                            <td class="p-4 text-gray-400">${movie.genre || 'N/A'}</td>
+                            <td class="p-4 text-gray-400">${movie.type || 'N/A'}</td>
+                            <td class="p-4 text-gray-400">${movie.category || 'None'}</td>
+                            <td class="p-4 text-sm text-gray-400">${updatedDate}</td>
+                            <td class="p-4">
+                                <button class="edit-btn text-blue-400 hover:text-blue-300 mr-2" data-id="${doc.id}"><i data-lucide="edit"></i></button>
+                                <button class="delete-btn text-red-500 hover:text-red-400" data-id="${doc.id}"><i data-lucide="trash-2"></i></button>
+                            </td>
+                        </tr>`;
+                }).join('');
+                lucide.createIcons();
+            });
+
+            movieForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                saveBtn.disabled = true;
+                saveBtnText.textContent = 'Saving...';
+                saveSpinner.classList.remove('hidden');
+                lucide.createIcons();
+
+                const movieId = document.getElementById('movie-id').value;
+                const contentType = contentTypeSelect.value;
+
+                let videoData = {}; // Will contain videoUrl (string) or episodes (array)
+                let subtitlesData = []; // Main subtitles for Movie type
+
+                // Collect Subtitles for Movie
+                if (contentType === 'Movie') {
+                    videoData.videoUrl = movieVideoUrlInput.value;
+                    movieSubtitlesContainer.querySelectorAll('.subtitle-item').forEach(item => {
+                        subtitlesData.push({
+                            label: item.querySelector('.subtitle-label').value,
+                            srclang: item.querySelector('.subtitle-srclang').value,
+                            url: item.querySelector('.subtitle-url').value,
+                            default: item.querySelector('.subtitle-default').checked
+                        });
+                    });
+                } 
+                // Collect Episodes and their Subtitles for TV Series
+                else if (contentType === 'TV Series') {
+                    videoData.episodes = [];
+                    episodesList.querySelectorAll('.episode-item').forEach(episodeItem => {
+                        const episodeSubtitles = [];
+                        episodeItem.querySelectorAll('.subtitle-item').forEach(subItem => {
+                            episodeSubtitles.push({
+                                label: subItem.querySelector('.subtitle-label').value,
+                                srclang: subItem.querySelector('.subtitle-srclang').value,
+                                url: subItem.querySelector('.subtitle-url').value,
+                                default: subItem.querySelector('.subtitle-default').checked
+                            });
+                        });
+                        videoData.episodes.push({
+                            title: episodeItem.querySelector('.episode-title').value,
+                            url: episodeItem.querySelector('.episode-url').value,
+                            subtitles: episodeSubtitles
+                        });
+                    });
+                }
+
+                const commonData = {
+                    title: titleInput.value,
+                    poster: posterInput.value,
+                    backdrop: backdropUrlInput.value || null, // NEW: Save backdrop URL
+                    tmdbId: tmdbIdInput.value || null, 
+                    description: descriptionInput.value,
+                    genre: genreInput.value,
+                    country: document.getElementById('country').value,
+                    year: parseInt(yearInput.value) || null, 
+                    quality: document.getElementById('quality').value,
+                    rating: parseFloat(ratingInput.value) || null, 
+                    votes: parseInt(votesInput.value) || null, 
+                    isFeatured: document.getElementById('isFeatured').value === 'true',
+                    type: contentType,
+                    category: document.getElementById('category').value,
+                    trendingScope: document.getElementById('trendingScope').value,
+                    updatedAt: serverTimestamp()
+                };
+                
+                // Combine common data with type-specific video/subtitle data
+                const movieData = { ...commonData, ...videoData };
+                if (contentType === 'Movie') {
+                    movieData.subtitles = subtitlesData; // Only for Movie type
+                }
+                // For TV Series, subtitles are nested within episodes, already handled by videoData.episodes
+
+                try {
+                    if (movieId) {
+                        await updateDoc(doc(db, "movies", movieId), movieData);
+                    } else {
+                        await addDoc(moviesCollection, movieData);
+                    }
+                    closeModal(movieModal);
+                } catch (error) {
+                    console.error("Error saving data:", error);
+                    alert("Failed to save. Please try again. Check console for details.");
+                } finally {
+                    saveBtn.disabled = false;
+                    saveBtnText.textContent = 'Save Content';
+                    saveSpinner.classList.add('hidden');
+                }
+            });
+
+            moviesTableBody.addEventListener('click', async (e) => {
+                const button = e.target.closest('button');
+                if (!button) return;
+                const id = button.dataset.id;
+                if (button.classList.contains('edit-btn')) {
+                    const docSnap = await getDoc(doc(db, "movies", id));
+                    if (docSnap.exists()) {
+                        const movie = docSnap.data();
+                        document.getElementById('movie-id').value = id;
+                        modalTitle.textContent = 'Edit Content';
+                        
+                        // Populate common fields
+                        titleInput.value = movie.title || '';
+                        posterInput.value = movie.poster || '';
+                        backdropUrlInput.value = movie.backdrop || ''; // NEW: Populate backdrop URL
+                        tmdbIdInput.value = movie.tmdbId || '';
+                        descriptionInput.value = movie.description || '';
+                        genreInput.value = movie.genre || '';
+                        document.getElementById('country').value = movie.country || countries[0];
+                        yearInput.value = movie.year || '';
+                        document.getElementById('quality').value = movie.quality || 'HD';
+                        ratingInput.value = movie.rating || '';
+                        votesInput.value = movie.votes || '';
+                        document.getElementById('isFeatured').value = movie.isFeatured ? 'true' : 'false';
+                        document.getElementById('category').value = movie.category || 'None';
+                        document.getElementById('trendingScope').value = movie.trendingScope || 'None';
+                        contentTypeSelect.value = movie.type || 'Movie';
+
+                        // Clear and populate dynamic fields based on type
+                        clearDynamicFields();
+                        toggleContentTypeFields(); // Show/hide sections first
+
+                        if (movie.type === 'Movie') {
+                            movieVideoUrlInput.value = movie.videoUrl || '';
+                            if (movie.subtitles && Array.isArray(movie.subtitles)) {
+                                movie.subtitles.forEach(sub => addSubtitleForm(movieSubtitlesContainer, sub));
+                            }
+                        } else if (movie.type === 'TV Series') {
+                            if (movie.episodes && Array.isArray(movie.episodes)) {
+                                movie.episodes.forEach(ep => addEpisodeForm(ep));
+                            }
+                        }
+                        
+                        openModal(movieModal);
+                    }
+                } else if (button.classList.contains('delete-btn')) {
+                    movieIdToDelete = id;
+                    openModal(deleteModal);
+                }
+            });
+
+            cancelDeleteBtn.addEventListener('click', () => closeModal(deleteModal));
+            confirmDeleteBtn.addEventListener('click', async () => {
+                if (movieIdToDelete) {
+                    await deleteDoc(doc(db, "movies", movieIdToDelete));
+                    closeModal(deleteModal);
+                }
+            });
+        }
+        
+        signInAnonymously(auth).then(mainApp).catch(console.error);
+
+        lucide.createIcons();
+    </script>
+</body>
+</html>
