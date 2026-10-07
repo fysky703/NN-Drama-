@@ -1,0 +1,30 @@
+node_modules/
+.next/
+out/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+.env
+.env.local
+.env*.local
+
+# local fallback stores
+.data/
+prisma/dev.db
+
+# generated scan artifacts served locally
+apps/web/public/scans/
+apps/web/public/generated/
+apps/worker/.cache/
+
+# logs / os
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# playwright
+apps/worker/.pw-browsers/
+*.png.tmp

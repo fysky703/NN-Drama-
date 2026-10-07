@@ -1,0 +1,60 @@
+// NN Drama database schema (Prisma ORM)
+// Production persistence behind the Store interface. In dev the app falls
+// back to a zero-config file store unless DATABASE_URL is set.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Phase 4: authentication expands this model.
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  createdAt DateTime  @default(now())
+  projects  Project[]
+}
+
+model Project {
+  id         String   @id @default(cuid())
+  name       String
+  url        String
+  status     String   @default("queued")
+  framework  String   @default("nextjs")
+  similarity Float?
+  thumbnail  String?
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  scans      Scan[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// The full scan record (report, design spec, generated project, comparisons)
+// is stored as a JSON document for flexibility; the relational columns cover
+// the common query paths used by the dashboard and project history.
+model Scan {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  url        String
+  status     String   @default("queued")
+  framework  String   @default("nextjs")
+  aiProvider String   @default("rule-based")
+  error      String?
+  data       Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([status])
+  @@index([createdAt])
+}
